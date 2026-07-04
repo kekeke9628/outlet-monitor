@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>경쟁사 현황 · 주간 모니터링</title>
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
+<link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0E1013; --bg-elev:#14161C; --surface:#191C23; --surface-2:#1F232B;
+    --line:#282C36; --line-soft:#22262E;
+    --tx:#E9ECF1; --tx-2:#9AA1AD; --tx-mut:#666D7A;
+    --accent:#3DD9B0;               /* UI: active / focus / new */
+    --sse:#E7BC63;                  /* 신세계(우리) 골드 */
+    --sse-tint:rgba(231,188,99,.10);
+    --hyundai:#7FA0CC;              /* 현대 */
+    --lotte:#DE6C7E;                /* 롯데 */
+    --danger:#E9736B;
+    --r:16px; --r-sm:11px;
+    --mono:ui-monospace,"SF Mono",Menlo,"Roboto Mono",monospace;
+    --font:"Pretendard Variable",Pretendard,-apple-system,BlinkMacSystemFont,system-ui,"Malgun Gothic",sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+  html{scroll-behavior:smooth;}
+  @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto;} *{transition:none!important;animation:none!important;}}
+  body{
+    background:var(--bg);color:var(--tx);font-family:var(--font);
+    font-size:15px;line-height:1.5;letter-spacing:-.01em;
+    -webkit-font-smoothing:antialiased;padding-bottom:env(safe-area-inset-bottom);
+  }
+  .shell{max-width:520px;margin:0 auto;min-height:100vh;background:var(--bg);position:relative;}
+
+  /* ---------- header + filters (sticky) ---------- */
+  .topbar{position:sticky;top:0;z-index:30;background:rgba(14,16,19,.86);
+    backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+    border-bottom:1px solid var(--line-soft);}
+  #app-header{display:flex;align-items:center;justify-content:space-between;
+    gap:12px;padding:14px 18px 10px;}
+  .brand-mark{display:flex;align-items:center;gap:9px;}
+  .brand-mark .glyph{width:9px;height:22px;border-radius:3px;
+    background:linear-gradient(var(--sse),#c99b3e);box-shadow:0 0 12px rgba(231,188,99,.35);}
+  #app-header h1{font-size:15.5px;font-weight:700;letter-spacing:-.02em;}
+  #app-header .sub{font-size:11px;color:var(--tx-mut);font-weight:500;margin-top:1px;}
+  .crawl-time{text-align:right;font-size:10.5px;color:var(--tx-2);line-height:1.35;}
+  .crawl-time b{display:block;color:var(--tx);font-family:var(--mono);font-size:11px;font-weight:600;}
+  .crawl-time .dot{display:inline-block;width:6px;height:6px;border-radius:50%;
+    background:var(--accent);margin-right:4px;box-shadow:0 0 6px var(--accent);vertical-align:1px;}
+
+  .chiprow{display:flex;gap:7px;overflow-x:auto;padding:4px 18px 12px;
+    scrollbar-width:none;}
+  .chiprow::-webkit-scrollbar{display:none;}
+  #period-filter{border-top:1px solid var(--line-soft);padding-top:11px;}
+  #period-filter .lbl{flex:0 0 auto;align-self:center;font-size:10.5px;
+    color:var(--tx-mut);font-weight:600;padding-right:2px;letter-spacing:0;}
+  .chip{flex:0 0 auto;border:1px solid var(--line);background:var(--bg-elev);
+    color:var(--tx-2);font-family:inherit;font-size:12.5px;font-weight:600;
+    padding:7px 13px;border-radius:999px;cursor:pointer;white-space:nowrap;
+    transition:all .16s ease;min-height:34px;}
+  .chip:hover{border-color:#3a3f4a;color:var(--tx);}
+  .chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);
+    color:#08130F;box-shadow:0 2px 14px rgba(61,217,176,.28);}
+  .chip:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+  #category-nav .chip[data-active="true"]{border-color:var(--sse);color:var(--sse);}
+
+  .customrange{display:none;gap:8px;align-items:center;padding:0 18px 12px;flex-wrap:wrap;}
+  .customrange.on{display:flex;}
+  .customrange input[type=date]{background:var(--bg-elev);border:1px solid var(--line);
+    color:var(--tx);font-family:var(--mono);font-size:12.5px;padding:8px 10px;
+    border-radius:10px;color-scheme:dark;flex:1 1 130px;min-height:38px;}
+  .customrange span{color:var(--tx-mut);font-size:12px;}
+
+  /* ---------- overview scoreboard ---------- */
+  section{scroll-margin-top:150px;}
+  #overview{padding:16px 16px 6px;}
+  .eyebrow{font-size:10.5px;font-weight:700;letter-spacing:.14em;
+    color:var(--tx-mut);text-transform:uppercase;margin-bottom:11px;display:flex;
+    align-items:center;gap:8px;}
+  .eyebrow .rng{color:var(--accent);letter-spacing:.02em;font-family:var(--mono);
+    text-transform:none;font-weight:600;}
+  .board{background:var(--surface);border:1px solid var(--line-soft);
+    border-radius:var(--r);padding:6px 4px;}
+  .board-row{display:grid;grid-template-columns:96px 1fr auto;align-items:center;
+    gap:10px;padding:12px 14px;border-bottom:1px solid var(--line-soft);}
+  .board-row:last-child{border-bottom:none;}
+  .b-name{display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:700;}
+  .b-name .idot{width:9px;height:9px;border-radius:50%;flex:0 0 auto;}
+  .b-name.sse{color:var(--sse);} .b-name.sse .idot{background:var(--sse);box-shadow:0 0 8px rgba(231,188,99,.4);}
+  .b-name.hyundai .idot{background:var(--hyundai);} .b-name.lotte .idot{background:var(--lotte);}
+  .b-name .tag{font-size:9px;font-weight:800;color:#0d0f13;background:var(--sse);
+    padding:1px 5px;border-radius:4px;letter-spacing:.02em;}
+  .bars{display:flex;gap:3px;height:26px;align-items:flex-end;}
+  .bars i{flex:1;background:var(--surface-2);border-radius:2px 2px 0 0;min-height:3px;
+    transition:height .4s cubic-bezier(.2,.7,.3,1);}
+  .board-row.sse .bars i{background:linear-gradient(var(--sse),#8f6f28);}
+  .board-row.hyundai .bars i{background:var(--hyundai);opacity:.85;}
+  .board-row.lotte .bars i{background:var(--lotte);opacity:.85;}
+  .b-total{font-family:var(--mono);font-size:24px;font-weight:700;line-height:1;
+    text-align:right;min-width:42px;}
+  .b-total small{display:block;font-size:9.5px;color:var(--tx-mut);font-weight:600;
+    font-family:var(--font);margin-top:3px;letter-spacing:.02em;}
+  .b-total .nw{color:var(--accent);}
+
+  /* ---------- category sections ---------- */
+  .cat{padding:18px 16px 4px;}
+  .cat-head{display:flex;align-items:baseline;justify-content:space-between;
+    gap:10px;margin-bottom:12px;}
+  .cat-head .t{display:flex;align-items:center;gap:9px;}
+  .cat-head h2{font-size:16px;font-weight:800;letter-spacing:-.02em;}
+  .cat-head .no{font-family:var(--mono);font-size:11px;color:var(--tx-mut);font-weight:700;}
+  .badge-semi{font-size:9.5px;font-weight:800;color:var(--accent);
+    border:1px solid rgba(61,217,176,.4);background:rgba(61,217,176,.08);
+    padding:2px 7px;border-radius:6px;letter-spacing:.02em;}
+  .cnt-mini{display:flex;gap:9px;align-items:center;font-family:var(--mono);
+    font-size:12px;font-weight:700;}
+  .cnt-mini span{display:inline-flex;align-items:center;gap:4px;color:var(--tx-2);}
+  .cnt-mini .d{width:7px;height:7px;border-radius:50%;}
+  .cnt-mini .d.sse{background:var(--sse);} .cnt-mini .d.hy{background:var(--hyundai);}
+  .cnt-mini .d.lo{background:var(--lotte);}
+
+  .brandblock{background:var(--surface);border:1px solid var(--line-soft);
+    border-left:3px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:9px;}
+  .brandblock.sse{border-left-color:var(--sse);background:
+    linear-gradient(var(--sse-tint),var(--sse-tint)),var(--surface);}
+  .brandblock.hyundai{border-left-color:var(--hyundai);}
+  .brandblock.lotte{border-left-color:var(--lotte);}
+  .bb-top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:2px;}
+  .bb-name{display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:700;color:var(--tx);}
+  .bb-name .idot{width:8px;height:8px;border-radius:50%;}
+  .brandblock.sse .bb-name{color:var(--sse);} .brandblock.sse .idot{background:var(--sse);}
+  .brandblock.hyundai .idot{background:var(--hyundai);}
+  .brandblock.lotte .idot{background:var(--lotte);}
+  .bb-name .me{font-size:8.5px;font-weight:800;color:#0d0f13;background:var(--sse);
+    padding:1px 5px;border-radius:4px;}
+  .bb-count{font-family:var(--mono);font-size:11.5px;color:var(--tx-mut);font-weight:700;}
+  .item{padding:9px 0 3px;border-top:1px solid var(--line-soft);margin-top:8px;}
+  .item:first-of-type{border-top:none;margin-top:4px;}
+  .item .h{display:flex;align-items:flex-start;gap:7px;}
+  .item .ttl{font-size:13.5px;font-weight:600;color:var(--tx);line-height:1.4;flex:1;}
+  .item .ttl a{color:inherit;text-decoration:none;border-bottom:1px solid transparent;}
+  .item .ttl a:hover{border-bottom-color:var(--tx-2);}
+  .newpill{flex:0 0 auto;font-size:9px;font-weight:800;color:#08130F;
+    background:var(--accent);padding:1px 6px;border-radius:5px;margin-top:2px;}
+  .meta{display:flex;flex-wrap:wrap;gap:6px 10px;margin-top:5px;font-size:11px;
+    color:var(--tx-mut);font-weight:500;}
+  .meta .typ{color:var(--tx-2);border:1px solid var(--line);border-radius:5px;
+    padding:0 6px;font-weight:600;}
+  .meta .dt{font-family:var(--mono);}
+  .meta .srclink{margin-left:auto;color:var(--accent);text-decoration:none;
+    font-weight:700;font-size:10.5px;border:1px solid rgba(61,217,176,.35);
+    border-radius:6px;padding:1px 7px;transition:.15s;}
+  .meta .srclink:hover{background:rgba(61,217,176,.1);}
+  .meta .srclink:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+  .empty{color:var(--tx-mut);font-size:12px;font-style:normal;padding:6px 0 2px;
+    display:flex;align-items:center;gap:7px;}
+  .empty::before{content:"";width:14px;height:1px;background:var(--tx-mut);opacity:.6;}
+  .brandblock.dim{opacity:.5;}
+
+  .more{margin:2px 0 4px;}
+  .more button{width:100%;background:transparent;border:1px dashed var(--line);
+    color:var(--tx-2);font-family:inherit;font-size:12px;font-weight:600;
+    padding:9px;border-radius:10px;cursor:pointer;transition:.15s;min-height:38px;}
+  .more button:hover{border-color:#3a3f4a;color:var(--tx);}
+  .more button:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+  .collapsed .item.extra{display:none;}
+
+  /* ---------- crawl status + footer ---------- */
+  #crawl-status{margin:20px 16px 0;background:var(--bg-elev);
+    border:1px solid var(--line-soft);border-radius:var(--r);padding:14px 16px;}
+  #crawl-status .eyebrow{margin-bottom:12px;}
+  .src{display:flex;align-items:center;justify-content:space-between;gap:10px;
+    padding:8px 0;border-top:1px solid var(--line-soft);font-size:12.5px;}
+  .src:first-of-type{border-top:none;}
+  .src .n{color:var(--tx-2);font-weight:600;}
+  .src .st{display:flex;align-items:center;gap:6px;font-family:var(--mono);
+    font-size:11px;font-weight:700;}
+  .src .st .p{width:7px;height:7px;border-radius:50%;}
+  .st.ok{color:var(--accent);} .st.ok .p{background:var(--accent);box-shadow:0 0 6px var(--accent);}
+  .st.semi{color:var(--sse);} .st.semi .p{background:var(--sse);}
+  .st.err{color:var(--danger);} .st.err .p{background:var(--danger);box-shadow:0 0 6px var(--danger);}
+
+  #app-footer{padding:20px 18px 34px;color:var(--tx-mut);font-size:10.5px;line-height:1.6;}
+  #app-footer b{color:var(--tx-2);}
+  .databanner{margin:12px 16px 0;padding:9px 13px;border-radius:11px;font-size:11.5px;
+    font-weight:600;line-height:1.45;border:1px solid;}
+  .databanner.sample{background:rgba(231,188,99,.09);border-color:rgba(231,188,99,.4);color:var(--sse);}
+  .databanner.err{background:rgba(233,115,107,.09);border-color:rgba(233,115,107,.4);color:var(--danger);}
+  .mock-note{margin:14px 16px 0;font-size:10px;color:var(--tx-mut);text-align:center;
+    letter-spacing:.02em;opacity:.8;}
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- ======= TOP BAR ======= -->
+  <div class="topbar">
+    <div id="app-header">
+      <div class="brand-mark">
+        <span class="glyph" aria-hidden="true"></span>
+        <div>
+          <h1>경쟁사 현황</h1>
+          <div class="sub">현대 · 롯데 · 신세계 주간 모니터링</div>
+        </div>
+      </div>
+      <div class="crawl-time">
+        최종 수집
+        <b id="lastCrawl"><span class="dot"></span>—</b>
+      </div>
+    </div>
+
+    <div id="period-filter" class="chiprow" role="group" aria-label="기간 선택">
+      <span class="lbl">기간</span>
+      <button class="chip" data-period="7"  aria-pressed="true">지난 1주</button>
+      <button class="chip" data-period="14" aria-pressed="false">지난 2주</button>
+      <button class="chip" data-period="month" aria-pressed="false">이번 달</button>
+      <button class="chip" data-period="custom" aria-pressed="false">사용자 지정</button>
+    </div>
+    <div class="customrange" id="customrange">
+      <input type="date" id="dFrom" aria-label="시작일">
+      <span>~</span>
+      <input type="date" id="dTo" aria-label="종료일">
+      <button class="chip" id="applyCustom" style="border-color:var(--accent);color:var(--accent)">적용</button>
+    </div>
+
+    <div id="category-nav" class="chiprow" role="group" aria-label="카테고리 이동">
+      <button class="chip" data-go="overview" data-active="true">종합</button>
+      <button class="chip" data-go="promotions">프로모션</button>
+      <button class="chip" data-go="events">이벤트</button>
+      <button class="chip" data-go="new-brands">신규입점</button>
+      <button class="chip" data-go="social">SNS</button>
+      <button class="chip" data-go="news">뉴스</button>
+      <button class="chip" data-go="foreign-trends">외국인</button>
+    </div>
+  </div>
+
+  <div id="databanner" class="databanner" hidden></div>
+
+  <!-- ======= OVERVIEW ======= -->
+  <section id="overview">
+    <div class="eyebrow">종합 스코어보드 <span class="rng" id="rangeLabel"></span></div>
+    <div class="board" id="board"><!-- rows injected --></div>
+  </section>
+
+  <!-- category sections injected here -->
+  <div id="cats"></div>
+
+  <!-- ======= CRAWL STATUS ======= -->
+  <section id="crawl-status">
+    <div class="eyebrow">수집 상태</div>
+    <div id="src-list"><!-- injected from payload.sources --></div>
+  </section>
+
+  <div class="mock-note">※ 대시보드는 크롤러가 생성한 <b>data.json</b> 만 읽습니다. 각 항목의 <b>출처 ↗</b> 링크는 수집된 원문 URL로 연결됩니다(뉴스는 제목 기반 네이버 뉴스 검색).</div>
+
+  <footer id="app-footer">
+    <b>데이터 출처</b> · 각 사 공식 홈페이지 · 네이버 뉴스 · 유튜브 공식 채널 · 한국관광 데이터랩 · 인스타그램(반자동 입력)<br>
+    수집 항목은 제목·기간·링크 등 공개 사실 정보에 한하며, 원문은 각 출처로 연결됩니다.
+  </footer>
+</div>
+
+<script>
+/* ================= 데이터 계층 =================
+   대시보드는 크롤러가 생성한 스냅샷(data.json)만 읽는다.
+   실서비스에서는 API_ENDPOINT 를 WordPress REST 로 교체:
+     /wp-json/outlet-monitor/v1/snapshot
+================================================= */
+const API_ENDPOINT = "data.json";
+
+/* 뷰 표현용 카테고리 메타(레이아웃 소유). 데이터 내용과 분리. */
+const CATS=[
+  {id:"promotions",   no:"01", name:"프로모션 / 세일", mode:"status"},
+  {id:"events",       no:"02", name:"이벤트 / 팝업 / 콘텐츠", mode:"status"},
+  {id:"new-brands",   no:"03", name:"신규 입점 브랜드", mode:"event"},
+  {id:"social",       no:"04", name:"SNS", mode:"event", semi:true},
+  {id:"news",         no:"05", name:"뉴스", mode:"event"},
+  {id:"foreign-trends",no:"06",name:"외국인 동향", mode:"event"},
+];
+const BRANDS=[{key:"sse",label:"신세계",me:true},{key:"hyundai",label:"현대"},{key:"lotte",label:"롯데"}];
+const SRC_STATUS={auto:{c:"ok",t:"정상"},semi:{c:"semi",t:"반자동"},error:{c:"err",t:"오류"}};
+
+/* 오프라인/샌드박스 폴백용 내장 스냅샷 (data.json 로드 실패 시 사용) */
+const SAMPLE=/*__SAMPLE__*/{
+  "generatedAt": "2026-07-04T17:44:23.524956+09:00",
+  "sources": [
+    {
+      "id": "home-sse",
+      "name": "신세계 공식 홈페이지",
+      "status": "auto",
+      "lastRun": "2026-07-04T17:44:23.524956+09:00",
+      "note": "5건"
+    },
+    {
+      "id": "home-hyundai",
+      "name": "현대 공식 홈페이지",
+      "status": "auto",
+      "lastRun": "2026-07-04T17:44:23.524956+09:00",
+      "note": "4건"
+    },
+    {
+      "id": "home-lotte",
+      "name": "롯데 공식 홈페이지",
+      "status": "auto",
+      "lastRun": "2026-07-04T17:44:23.524956+09:00",
+      "note": "3건"
+    },
+    {
+      "id": "news",
+      "name": "뉴스 검색 API",
+      "status": "auto",
+      "lastRun": "2026-07-04T17:44:23.524956+09:00",
+      "note": "4건"
+    },
+    {
+      "id": "youtube",
+      "name": "유튜브 공식 채널",
+      "status": "auto",
+      "lastRun": "2026-07-04T17:44:23.524956+09:00",
+      "note": "1건"
+    },
+    {
+      "id": "insta",
+      "name": "인스타그램",
+      "status": "semi",
+      "lastRun": "2026-07-04T17:44:23.524956+09:00",
+      "note": "4건"
+    },
+    {
+      "id": "tourism",
+      "name": "외국인 동향(뉴스 RSS)",
+      "status": "auto",
+      "lastRun": "2026-07-04T17:44:23.524956+09:00",
+      "note": "4건"
+    }
+  ],
+  "activities": [
+    {
+      "brand": "hyundai",
+      "category": "events",
+      "title": "키즈 워터플레이 존",
+      "type": "체험",
+      "start": "2026-06-28",
+      "end": "2026-08-10",
+      "collect": "auto",
+      "source": "공식 홈페이지",
+      "url": "https://www.ehyundai.com/newPortal/outlet/main.do",
+      "id": "fc7407a9a7f1",
+      "collectedAt": "2026-07-04T17:44:23.524956+09:00",
+      "isNew": false
+    },
+    {
+      "brand": "sse",
+      "category": "events",
+      "title": "아이스 & 스노우 존 팝업",
+      "type": "체험",
+      "start": "2026-07-01",
+      "end": "2026-07-31",
+      "collect": "auto",
+      "source": "공식 홈페이지",
+      "url": "https://www.premiumoutlets.co.kr/",
+      "id": "24300dcfb878",
+      "collectedAt": "2026-07-04T17:44:23.524956+09:00",
+      "isNew": false
+    },
+    {
+      "brand": "sse",
+      "category": "promotions",
+      "title": "여름 시즌오프 최대 70%",
+      "type": "시즌오프",
+      "start": "2026-06-27",
+      "end": "2026-07-13",
+      "collect": "auto",
+      "source": "공식 홈페이지",
+      "url": "https://www.premiumoutlets.co.kr/",
+      "id": "ad0284472f4e",
+      "collectedAt": "2026-07-04T17:44:23.524956+09:00",
+      "isNew": false
+    },
+    {
+      "brand": "lotte",
+      "category": "promotions",
+      "title": "블랙프라이스 위크",
+      "type": "특가",
+      "start": "2026-07-01",
+      "end": "2026-07-07",
+      "collect": "auto",
+      "source": "공식 홈페이지",
+      "url": "https://www.lotteshopping.com/",
+      "id": "ddc8ace077e0",
+      "collectedAt": "2026-07-04T17:44:23.524956+09:00",
+      "isNew": false
+    },
+    {
+      "brand": "hyundai",
+      "category": "promotions",
+      "title": "썸머 페스타 세일",
+      "type": "시즌세일",
+      "start": "2026-06-20",
+      "end": "2026-07-06",
+      "collect": "auto",
+      "source": "공식 홈페이지",
+      "url": "https://www.ehyundai.com/newPortal/outlet/main.do",
+      "id": "695f1a4e818b",
+      "collectedAt": "2026-07-04T17:44:23.524956+09:00",
+      "isNew": false
+    },
+    {
+      "brand": "sse",
+      "category": "promotions",
+      "title": "골드 멤버스 위크 (추가 5%)",
+      "type": "멤버십데이",
+      "start": "2026-07-01",
+      "end": "2026-07-04",
+      "collect": "auto",
+      "source": "공식 홈페이지",
+      "url": "https://www.premiumoutlets.co.kr/",
+      "id": "d6f3b62baccf",
+      "collectedAt": "2026-07-04T17:44:23.524956+09:00",
+      "isNew": false
+    },
+    {
+      "brand": "sse",
+      "category": "news",
+      "title": "여주 아울렛, 외국인 매출 비중 20% 돌파",
+      "type": "매일경제",
+      "date": "2026-07-03",
+      "collect": "auto",
+      "source": "뉴스 검색",
+      "url": "https://search.naver.com/search.naver?where=news&query=%EC%97%AC%EC%A3%BC%20%EC%95%84%EC%9A%B8%EB%A0%9B%2C%20%EC%99%B8%EA%B5%AD%EC%9D%B8%20%EB%A7%A4%EC%B6%9C%20%EB%B9%84%EC%A4%91%2020%25%20%EB%8F%8C%ED%8C%8C",
+      "id": "8902f8504eaf",
+      "collectedAt": "2026-07-04T17:44:23.524956+09:00",
+      "isNew": false
+    },
+    {
+      "brand": "sse",
+      "category": "social",
+      "title": "인스타 릴스 · 스노우존 티저",
+      "type": "인스타",
+      "date": "2026-07-03",
+      "collect": "semi",
+      "source": "인스타그램",
+      "url": "https://www.instagram.com/premiumoutlets.korea/",
+      "id": "c4a47d8cc93e",
+      "collectedAt": "2026-07-04T17:44:23.524956+09:00",
+      "isNew": false
+    },
+    {
+      "brand": "sse",
+      "category": "new-brands",
+      "title": "명품 시계 편집숍 신규 오픈",
+      "type": "럭셔리",
+      "date": "2026-07-02",
+      "collect": "auto",
+      "source": "공식 홈페이지",
+      "url": "https://www.premiumoutlets.co.kr/",
+      "id": "6214f1f233f2",
+      "collectedAt": "2026-07-04T17:44:23.524956+09:00",
+      "isNew": false
+    },
+    {
+      "brand": "hyundai",
+      "category": "social",
+      "title": "인스타 · 워터플레이 오픈 안내",
+      "type": "인스타",
+      "date": "2026-07-02",
+      "collect": "semi",
+      "source": "인스타그램",
+      "url": "https://www.instagram.com/hyundaioutlets/",
+      "id": "0a9b04c52551",
+      "collectedAt": "2026-07-04T17:44:23.524956+09:00",
+      "isNew": false
+    },
+    {
+      "brand": "sse",
+      "category": "foreign-trends",
+      "title": "외국인 원데이투어 직행버스 노선 확대",
+      "type": "서비스",
+      "date": "2026-07-02",
+      "collect": "auto",
+      "source": "공식 홈페이지",
+      "url": "https://www.premiumoutlets.co.kr/",
+      "id": "49fa15db673c",
+      "collectedAt": "2026-07-04T17:44:23.524956+09:00",
+      "isNew": false
+    },
+    {
+      "brand": "hyundai",
+      "category": "news",
+      "title": "현대아울렛 상반기 실적 발표",
+      "type": "연합뉴스",
+      "date": "2026-07-01",
+      "collect": "auto",
+      "source": "뉴스 검색",
+      "url": "https://search.naver.com/search.naver?where=news&query=%ED%98%84%EB%8C%80%EC%95%84%EC%9A%B8%EB%A0%9B%20%EC%83%81%EB%B0%98%EA%B8%B0%20%EC%8B%A4%EC%A0%81%20%EB%B0%9C%ED%91%9C",
+      "id": "881a7044106c",
+      "collectedAt": "2026-07-04T17:44:23.524956+09:00",
+      "isNew": false
+    },
+    {
+      "brand": "sse",
+      "category": "social",
+      "title": "유튜브 · 여름 브랜드 하울",
+      "type": "유튜브",
+      "date": "2026-07-01",
+      "collect": "auto",
+      "source": "유튜브",
+      "url": "https://www.premiumoutlets.co.kr/",
+      "id": "0dad296e39a7",
+      "collectedAt": "2026-07-04T17:44:23.524956+09:00",
+      "isNew": false
+    },
+    {
+      "brand": "lotte",
+      "category": "social",
+      "title": "인스타 · 블랙프라이스 카드뉴스",
+      "type": "인스타",
+      "date": "2026-07-01",
+      "collect": "semi",
+      "source": "인스타그램",
+      "url": "https://www.lotteshopping.com/",
+      "id": "249ebfa621ac",
+      "collectedAt": "2026-07-04T17:44:23.524956+09:00",
+      "isNew": false
+    },
+    {
+      "brand": "lotte",
+      "category": "foreign-trends",
+      "title": "다국어 안내 앱 업데이트 (영·중·일)",
+      "type": "디지털",
+      "date": "2026-07-01",
+      "collect": "auto",
+      "source": "공식 홈페이지",
+      "url": "https://www.lotteshopping.com/",
+      "id": "863549236fe2",
+      "collectedAt": "2026-07-04T17:44:23.524956+09:00",
+      "isNew": false
+    },
+    {
+      "brand": "lotte",
+      "category": "new-brands",
+      "title": "리빙관 확장 · 5개 브랜드 입점",
+      "type": "리빙",
+      "date": "2026-06-30",
+      "collect": "auto",
+      "source": "공식 홈페이지",
+      "url": "https://www.lotteshopping.com/",
+      "id": "2c5f1f4d95b1",
+      "collectedAt": "2026-07-04T17:44:23.524956+09:00",
+      "isNew": false
+    },
+    {
+      "brand": "lotte",
+      "category": "social",
+      "title": "인스타 · 신규 리빙관 소개",
+      "type": "인스타",
+      "date": "2026-06-30",
+      "collect": "semi",
+      "source": "인스타그램",
+      "url": "https://www.lotteshopping.com/",
+      "id": "3cda6e9c7712",
+      "collectedAt": "2026-07-04T17:44:23.524956+09:00",
+      "isNew": false
+    },
+    {
+      "brand": "sse",
+      "category": "events",
+      "title": "퓨전 전통 공연 위켄드",
+      "type": "공연",
+      "start": "2026-06-28",
+      "end": "2026-06-29",
+      "collect": "auto",
+      "source": "공식 홈페이지",
+      "url": "https://www.premiumoutlets.co.kr/",
+      "id": "c2e72d9b604a",
+      "collectedAt": "2026-07-04T17:44:23.524956+09:00",
+      "isNew": false
+    },
+    {
+      "brand": "lotte",
+      "category": "news",
+      "title": "롯데 프리미엄, 하반기 신규 브랜드 유치",
+      "type": "뉴스핌",
+      "date": "2026-06-29",
+      "collect": "auto",
+      "source": "뉴스 검색",
+      "url": "https://search.naver.com/search.naver?where=news&query=%EB%A1%AF%EB%8D%B0%20%ED%94%84%EB%A6%AC%EB%AF%B8%EC%97%84%2C%20%ED%95%98%EB%B0%98%EA%B8%B0%20%EC%8B%A0%EA%B7%9C%20%EB%B8%8C%EB%9E%9C%EB%93%9C%20%EC%9C%A0%EC%B9%98",
+      "id": "0b28ef386aec",
+      "collectedAt": "2026-07-04T17:44:23.524956+09:00",
+      "isNew": false
+    },
+    {
+      "brand": "hyundai",
+      "category": "foreign-trends",
+      "title": "은련(UnionPay) 결제 프로모션 개시",
+      "type": "결제혜택",
+      "date": "2026-06-28",
+      "collect": "auto",
+      "source": "공식 홈페이지",
+      "url": "https://www.ehyundai.com/newPortal/outlet/main.do",
+      "id": "17e52dbaaa57",
+      "collectedAt": "2026-07-04T17:44:23.524956+09:00",
+      "isNew": false
+    },
+    {
+      "brand": "hyundai",
+      "category": "promotions",
+      "title": "클리어런스 마켓",
+      "type": "클리어런스",
+      "start": "2026-06-10",
+      "end": "2026-06-25",
+      "collect": "auto",
+      "source": "공식 홈페이지",
+      "url": "https://www.ehyundai.com/newPortal/outlet/main.do",
+      "id": "33fcfde8182f",
+      "collectedAt": "2026-07-04T17:44:23.524956+09:00",
+      "isNew": false
+    },
+    {
+      "brand": "sse",
+      "category": "foreign-trends",
+      "title": "참고 · 6월 방한 외래객 전년比 +14%",
+      "type": "관광통계",
+      "date": "2026-06-25",
+      "collect": "auto",
+      "source": "관광 데이터랩",
+      "url": "https://datalab.visitkorea.or.kr/",
+      "id": "efc5675f3812",
+      "collectedAt": "2026-07-04T17:44:23.524956+09:00",
+      "isNew": false
+    },
+    {
+      "brand": "hyundai",
+      "category": "new-brands",
+      "title": "스포츠 플래그십 리뉴얼",
+      "type": "스포츠",
+      "date": "2026-06-18",
+      "collect": "auto",
+      "source": "공식 홈페이지",
+      "url": "https://www.ehyundai.com/newPortal/outlet/main.do",
+      "id": "e03b86341942",
+      "collectedAt": "2026-07-04T17:44:23.524956+09:00",
+      "isNew": false
+    },
+    {
+      "brand": "sse",
+      "category": "news",
+      "title": "신세계사이먼, 관광 허브 전략 공개",
+      "type": "머니투데이",
+      "date": "2026-06-16",
+      "collect": "auto",
+      "source": "뉴스 검색",
+      "url": "https://search.naver.com/search.naver?where=news&query=%EC%8B%A0%EC%84%B8%EA%B3%84%EC%82%AC%EC%9D%B4%EB%A8%BC%2C%20%EA%B4%80%EA%B4%91%20%ED%97%88%EB%B8%8C%20%EC%A0%84%EB%9E%B5%20%EA%B3%B5%EA%B0%9C",
+      "id": "a343909d4135",
+      "collectedAt": "2026-07-04T17:44:23.524956+09:00",
+      "isNew": false
+    },
+    {
+      "brand": "lotte",
+      "category": "events",
+      "title": "봄 아트 전시 <색의 정원>",
+      "type": "전시",
+      "start": "2026-06-01",
+      "end": "2026-06-15",
+      "collect": "auto",
+      "source": "공식 홈페이지",
+      "url": "https://www.lotteshopping.com/",
+      "id": "6ecf07d9011c",
+      "collectedAt": "2026-07-04T17:44:23.524956+09:00",
+      "isNew": false
+    }
+  ]
+}/*__/SAMPLE__*/;
+
+let PAYLOAD=null;
+const TODAY=new Date(); TODAY.setHours(0,0,0,0);   /* 오늘 기준(기간 필터) */
+const D=s=>new Date(s+"T00:00:00");
+const fmt=dt=>`${String(dt.getMonth()+1).padStart(2,"0")}.${String(dt.getDate()).padStart(2,"0")}`;
+const fmtTime=iso=>{const d=new Date(iso);return `${fmt(d)} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;};
+
+/* ---------- period ---------- */
+let range=computeRange("7");
+function computeRange(p){let to=new Date(TODAY),from=new Date(TODAY);
+  if(p==="7")from.setDate(to.getDate()-6);
+  else if(p==="14")from.setDate(to.getDate()-13);
+  else if(p==="month")from=new Date(TODAY.getFullYear(),TODAY.getMonth(),1);
+  return {from,to,p};}
+function inRange(a,mode){
+  if(mode==="event"){const d=D(a.date);return d>=range.from&&d<=range.to;}
+  const s=D(a.start),e=D(a.end);return s<=range.to&&e>=range.from;}
+function catMode(id){return (CATS.find(c=>c.id===id)||{}).mode;}
+
+/* ---------- render ---------- */
+function render(){
+  if(!PAYLOAD)return;
+  document.getElementById("lastCrawl").innerHTML=`<span class="dot"></span>${fmtTime(PAYLOAD.generatedAt)}`;
+  document.getElementById("rangeLabel").textContent=`${fmt(range.from)} – ${fmt(range.to)}`;
+
+  const acts=PAYLOAD.activities||[];
+  const pick=(cat,brand)=>acts.filter(a=>a.category===cat&&a.brand===brand&&inRange(a,catMode(cat)));
+  const totals={},perCat={};
+  BRANDS.forEach(b=>totals[b.key]={t:0,n:0});
+  CATS.forEach(c=>{perCat[c.id]={};BRANDS.forEach(b=>{
+    const it=pick(c.id,b.key);perCat[c.id][b.key]=it;
+    totals[b.key].t+=it.length;totals[b.key].n+=it.filter(x=>x.isNew).length;});});
+
+  document.getElementById("board").innerHTML=BRANDS.map(b=>{
+    const tt=totals[b.key];
+    const bars=CATS.map(c=>{const n=perCat[c.id][b.key].length;
+      return `<i style="height:${Math.min(100,n===0?6:14+n*22)}%"></i>`;}).join("");
+    return `<div class="board-row ${b.key}">
+      <div class="b-name ${b.key}"><span class="idot"></span>${b.label}${b.me?'<span class="tag">우리</span>':''}</div>
+      <div class="bars">${bars}</div>
+      <div class="b-total">${tt.t}<small>건 ${tt.n?`· <span class="nw">NEW ${tt.n}</span>`:""}</small></div>
+    </div>`;}).join("");
+
+  document.getElementById("cats").innerHTML=CATS.map(c=>{
+    const mini=BRANDS.map(b=>{const dc=b.key==="sse"?"sse":b.key==="hyundai"?"hy":"lo";
+      return `<span><i class="d ${dc}"></i>${perCat[c.id][b.key].length}</span>`;}).join("");
+    const blocks=BRANDS.map(b=>{
+      const items=perCat[c.id][b.key],empty=items.length===0;
+      const rows=items.map((x,i)=>{
+        const dateTxt=catMode(c.id)==="event"?fmt(D(x.date)):`${fmt(D(x.start))}–${fmt(D(x.end))}`;
+        return `<div class="item ${i>=2?'extra':''}">
+          <div class="h"><div class="ttl"><a href="${x.url}" target="_blank" rel="noopener">${x.title}</a></div>
+            ${x.isNew?'<span class="newpill">NEW</span>':''}</div>
+          <div class="meta"><span class="typ">${x.type}</span><span class="dt">${dateTxt}</span>
+            <a class="srclink" href="${x.url}" target="_blank" rel="noopener">${x.source} ↗</a></div>
+        </div>`;}).join("");
+      const more=items.length>2;
+      return `<div class="brandblock ${b.key} ${empty?'dim':''} ${more?'collapsed':''}" data-block>
+        <div class="bb-top"><div class="bb-name"><span class="idot"></span>${b.label}${b.me?'<span class="me">우리</span>':''}</div>
+          <div class="bb-count">${items.length}건</div></div>
+        ${empty?'<div class="empty">이 기간 활동 없음</div>':rows}
+        ${more?`<div class="more"><button onclick="toggleMore(this)">+ ${items.length-2}건 더 보기</button></div>`:''}
+      </div>`;}).join("");
+    return `<section id="${c.id}" class="cat">
+      <div class="cat-head"><div class="t"><span class="no">${c.no}</span><h2>${c.name}</h2>
+        ${c.semi?'<span class="badge-semi">반자동</span>':''}</div>
+        <div class="cnt-mini">${mini}</div></div>
+      ${blocks}</section>`;}).join("");
+
+  renderSources();
+  observeSections();
+}
+
+function renderSources(){
+  document.getElementById("src-list").innerHTML=(PAYLOAD.sources||[]).map(s=>{
+    const st=SRC_STATUS[s.status]||SRC_STATUS.error;
+    return `<div class="src"><span class="n">${s.name}</span>
+      <span class="st ${st.c}"><span class="p"></span>${st.t}${s.note?` · ${s.note}`:""}</span></div>`;}).join("");
+}
+
+function toggleMore(btn){const block=btn.closest("[data-block]");
+  const collapsed=block.classList.toggle("collapsed");
+  const extra=block.querySelectorAll(".item.extra").length;
+  btn.textContent=collapsed?`+ ${extra}건 더 보기`:"접기";}
+
+/* ---------- controls ---------- */
+document.querySelectorAll("#period-filter .chip").forEach(ch=>{
+  ch.addEventListener("click",()=>{
+    document.querySelectorAll("#period-filter .chip").forEach(c=>c.setAttribute("aria-pressed","false"));
+    ch.setAttribute("aria-pressed","true");
+    const p=ch.dataset.period,cr=document.getElementById("customrange");
+    if(p==="custom"){cr.classList.add("on");
+      const f=document.getElementById("dFrom"),t=document.getElementById("dTo");
+      if(!f.value){const a=new Date(TODAY);a.setDate(a.getDate()-6);
+        f.value=a.toISOString().slice(0,10);t.value=TODAY.toISOString().slice(0,10);}return;}
+    cr.classList.remove("on");range=computeRange(p);render();});});
+document.getElementById("applyCustom").addEventListener("click",()=>{
+  const f=document.getElementById("dFrom").value,t=document.getElementById("dTo").value;
+  if(!f||!t)return;range={from:D(f),to:D(t),p:"custom"};render();});
+
+document.querySelectorAll("#category-nav .chip").forEach(ch=>{
+  ch.addEventListener("click",()=>{const el=document.getElementById(ch.dataset.go);
+    if(el)el.scrollIntoView({behavior:"smooth",block:"start"});});});
+const navChips=[...document.querySelectorAll("#category-nav .chip")];
+let io=null;
+function observeSections(){
+  if(io)io.disconnect();
+  io=new IntersectionObserver(ents=>{ents.forEach(e=>{if(e.isIntersecting){
+    navChips.forEach(c=>c.dataset.active="false");
+    const a=navChips.find(c=>c.dataset.go===e.target.id);if(a)a.dataset.active="true";}});},
+    {rootMargin:"-45% 0px -50% 0px",threshold:0});
+  ["overview",...CATS.map(c=>c.id)].forEach(id=>{const el=document.getElementById(id);if(el)io.observe(el);});
+}
+
+/* ---------- load ---------- */
+function banner(cls,msg){const b=document.getElementById("databanner");
+  b.className="databanner "+cls;b.textContent=msg;b.hidden=false;}
+async function load(){
+  try{
+    const res=await fetch(API_ENDPOINT,{cache:"no-store"});
+    if(!res.ok)throw new Error("HTTP "+res.status);
+    PAYLOAD=await res.json();render();
+  }catch(err){
+    if(SAMPLE){PAYLOAD=SAMPLE;render();
+      banner("sample",`실시간 데이터(${API_ENDPOINT})를 불러오지 못해 내장 샘플을 표시 중입니다. 서버 연결 시 자동 반영됩니다.`);}
+    else banner("err",`데이터를 불러오지 못했습니다: ${err.message}`);
+  }
+}
+load();
+</script>
+</body>
+</html>

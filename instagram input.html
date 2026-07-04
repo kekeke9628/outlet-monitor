@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>인스타 반자동 입력 · 경쟁사 모니터링</title>
+<link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0E1013;--surface:#191C23;--surface2:#1F232B;--line:#282C36;--line-soft:#22262E;
+    --tx:#E9ECF1;--tx2:#9AA1AD;--tx-mut:#666D7A;--accent:#3DD9B0;
+    --sse:#E7BC63;--hyundai:#7FA0CC;--lotte:#DE6C7E;--danger:#E9736B;
+    --font:"Pretendard Variable",Pretendard,-apple-system,system-ui,"Malgun Gothic",sans-serif;
+    --mono:ui-monospace,"SF Mono",Menlo,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+  body{background:var(--bg);color:var(--tx);font-family:var(--font);font-size:15px;
+    line-height:1.5;letter-spacing:-.01em;-webkit-font-smoothing:antialiased;
+    padding-bottom:env(safe-area-inset-bottom);}
+  .shell{max-width:520px;margin:0 auto;padding:16px 16px 40px;}
+  header{padding:6px 2px 16px;}
+  h1{font-size:17px;font-weight:800;letter-spacing:-.02em;}
+  .sub{font-size:11.5px;color:var(--tx-mut);margin-top:3px;line-height:1.5;}
+  .card{background:var(--surface);border:1px solid var(--line-soft);border-radius:16px;
+    padding:16px;margin-bottom:14px;}
+  .eyebrow{font-size:10.5px;font-weight:700;letter-spacing:.12em;color:var(--tx-mut);
+    text-transform:uppercase;margin-bottom:12px;}
+  label{display:block;font-size:11.5px;font-weight:700;color:var(--tx2);margin:10px 0 5px;}
+  input,select,textarea{width:100%;background:#0F1116;border:1px solid var(--line);
+    color:var(--tx);font-family:inherit;font-size:14px;padding:11px 12px;border-radius:10px;
+    color-scheme:dark;}
+  input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:var(--accent);}
+  textarea{min-height:92px;font-family:var(--mono);font-size:12px;resize:vertical;}
+  .seg{display:flex;gap:7px;}
+  .seg button{flex:1;background:#0F1116;border:1px solid var(--line);color:var(--tx2);
+    font-family:inherit;font-size:13px;font-weight:700;padding:11px 0;border-radius:10px;cursor:pointer;transition:.15s;}
+  .seg button[aria-pressed="true"]{color:#0d0f13;}
+  .seg button.sse[aria-pressed="true"]{background:var(--sse);border-color:var(--sse);}
+  .seg button.hyundai[aria-pressed="true"]{background:var(--hyundai);border-color:var(--hyundai);}
+  .seg button.lotte[aria-pressed="true"]{background:var(--lotte);border-color:var(--lotte);}
+  .btn{width:100%;border:none;border-radius:11px;font-family:inherit;font-size:14.5px;
+    font-weight:800;padding:13px;cursor:pointer;transition:.15s;margin-top:14px;}
+  .btn.primary{background:var(--accent);color:#08130F;}
+  .btn.primary:active{transform:translateY(1px);}
+  .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--tx2);font-weight:700;}
+  .row2{display:flex;gap:9px;}.row2>*{flex:1;}
+  .hint{font-size:10.5px;color:var(--tx-mut);margin-top:6px;line-height:1.5;}
+  .msg{font-size:12px;font-weight:700;margin-top:10px;min-height:16px;}
+  .msg.ok{color:var(--accent);}.msg.err{color:var(--danger);}
+  .counts{display:flex;gap:8px;margin-bottom:10px;font-family:var(--mono);font-size:12px;font-weight:700;}
+  .counts span{display:inline-flex;align-items:center;gap:5px;color:var(--tx2);}
+  .counts i{width:8px;height:8px;border-radius:50%;}
+  .counts .sse{background:var(--sse);}.counts .hyundai{background:var(--hyundai);}.counts .lotte{background:var(--lotte);}
+  .entry{border-top:1px solid var(--line-soft);padding:11px 0 9px;display:flex;gap:10px;align-items:flex-start;}
+  .entry:first-child{border-top:none;}
+  .entry .bar{width:3px;align-self:stretch;border-radius:2px;flex:0 0 auto;}
+  .entry.sse .bar{background:var(--sse);}.entry.hyundai .bar{background:var(--hyundai);}.entry.lotte .bar{background:var(--lotte);}
+  .entry .body{flex:1;min-width:0;}
+  .entry .t{font-size:13.5px;font-weight:600;line-height:1.4;word-break:break-word;}
+  .entry .m{font-size:11px;color:var(--tx-mut);margin-top:3px;font-family:var(--mono);}
+  .entry .m a{color:var(--tx2);}
+  .entry .del{background:transparent;border:1px solid var(--line);color:var(--tx-mut);
+    border-radius:8px;font-family:inherit;font-size:11px;font-weight:700;padding:5px 9px;cursor:pointer;flex:0 0 auto;}
+  .entry .del:active{color:var(--danger);border-color:var(--danger);}
+  .empty{color:var(--tx-mut);font-size:12.5px;padding:8px 0;}
+  details summary{cursor:pointer;font-size:12px;color:var(--tx2);font-weight:700;padding:4px 0;}
+  .out{margin-top:10px;}
+</style>
+</head>
+<body>
+<div class="shell">
+  <header>
+    <h1>인스타 반자동 입력</h1>
+    <div class="sub">각 사 공식 인스타그램 최신 게시물을 주 1회 입력해 <b>instagram_manual.json</b>을 만듭니다. 만든 파일을 수집 폴더에 두면 대시보드에 "반자동"으로 반영됩니다.</div>
+  </header>
+
+  <!-- 입력 -->
+  <div class="card">
+    <div class="eyebrow">게시물 추가</div>
+    <label>브랜드</label>
+    <div class="seg" id="brandSeg">
+      <button class="sse" data-b="sse" aria-pressed="true">신세계</button>
+      <button class="hyundai" data-b="hyundai" aria-pressed="false">현대</button>
+      <button class="lotte" data-b="lotte" aria-pressed="false">롯데</button>
+    </div>
+    <label>제목 / 내용 요약</label>
+    <input id="title" placeholder="예: 스노우존 오픈 릴스">
+    <div class="row2">
+      <div><label>게시일</label><input type="date" id="date"></div>
+    </div>
+    <label>게시물 링크 (선택)</label>
+    <input id="url" inputmode="url" placeholder="https://www.instagram.com/p/...">
+    <div class="hint">링크를 비우면 해당 브랜드 공식 계정으로 연결됩니다.</div>
+    <button class="btn primary" id="add">추가</button>
+    <div class="msg" id="msg"></div>
+  </div>
+
+  <!-- 목록 -->
+  <div class="card">
+    <div class="eyebrow">입력 목록 (<span id="count">0</span>)</div>
+    <div class="counts" id="counts"></div>
+    <div id="list"><div class="empty">아직 추가된 게시물이 없습니다.</div></div>
+    <div class="row2">
+      <button class="btn ghost" id="copy" style="margin-top:14px">JSON 복사</button>
+      <button class="btn ghost" id="download" style="margin-top:14px">다운로드</button>
+    </div>
+  </div>
+
+  <!-- 기존 파일 이어서 편집 -->
+  <div class="card">
+    <details>
+      <summary>기존 JSON 불러와 이어서 편집</summary>
+      <label style="margin-top:12px">instagram_manual.json 내용 붙여넣기</label>
+      <textarea id="importArea" placeholder='[{"brand":"sse","title":"...","date":"2026-07-03","url":"..."}]'></textarea>
+      <button class="btn ghost" id="importBtn">불러오기</button>
+    </details>
+    <div class="out">
+      <details>
+        <summary>현재 JSON 미리보기</summary>
+        <textarea id="preview" readonly style="margin-top:10px"></textarea>
+      </details>
+    </div>
+  </div>
+</div>
+
+<script>
+  const BRANDS={sse:"신세계",hyundai:"현대",lotte:"롯데"};
+  let brand="sse";
+  let items=[];  // {brand,title,date,url?}
+
+  // 오늘 날짜 기본값
+  const today=new Date();
+  document.getElementById("date").value=today.toISOString().slice(0,10);
+
+  // 브랜드 세그먼트
+  document.querySelectorAll("#brandSeg button").forEach(b=>{
+    b.addEventListener("click",()=>{
+      document.querySelectorAll("#brandSeg button").forEach(x=>x.setAttribute("aria-pressed","false"));
+      b.setAttribute("aria-pressed","true");brand=b.dataset.b;});
+  });
+
+  function msg(t,cls){const m=document.getElementById("msg");m.textContent=t;m.className="msg "+(cls||"");}
+
+  function add(){
+    const title=document.getElementById("title").value.trim();
+    const date=document.getElementById("date").value;
+    const url=document.getElementById("url").value.trim();
+    if(!title){msg("제목을 입력하세요.","err");return;}
+    if(!date){msg("게시일을 선택하세요.","err");return;}
+    const it={brand,title,date};
+    if(url)it.url=url;
+    items.push(it);
+    document.getElementById("title").value="";
+    document.getElementById("url").value="";
+    msg("추가되었습니다.","ok");
+    render();
+  }
+  document.getElementById("add").addEventListener("click",add);
+
+  function render(){
+    const list=document.getElementById("list");
+    document.getElementById("count").textContent=items.length;
+    // 브랜드별 카운트
+    const c={sse:0,hyundai:0,lotte:0};items.forEach(i=>c[i.brand]++);
+    document.getElementById("counts").innerHTML=Object.keys(BRANDS).map(k=>
+      `<span><i class="${k}"></i>${BRANDS[k]} ${c[k]}</span>`).join("");
+    // 목록
+    if(!items.length){list.innerHTML='<div class="empty">아직 추가된 게시물이 없습니다.</div>';}
+    else{
+      list.innerHTML=items.map((it,i)=>`
+        <div class="entry ${it.brand}">
+          <div class="bar"></div>
+          <div class="body">
+            <div class="t">${esc(it.title)}</div>
+            <div class="m">${BRANDS[it.brand]} · ${it.date}${it.url?` · <a href="${esc(it.url)}" target="_blank" rel="noopener">링크</a>`:""}</div>
+          </div>
+          <button class="del" data-i="${i}">삭제</button>
+        </div>`).join("");
+      list.querySelectorAll(".del").forEach(b=>b.addEventListener("click",()=>{
+        items.splice(+b.dataset.i,1);render();}));
+    }
+    document.getElementById("preview").value=json();
+  }
+  function esc(s){return (s||"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
+  function json(){return JSON.stringify(items,null,2);}
+
+  document.getElementById("copy").addEventListener("click",async()=>{
+    if(!items.length){msg("추가된 게시물이 없습니다.","err");return;}
+    try{await navigator.clipboard.writeText(json());msg("JSON을 복사했습니다.","ok");}
+    catch(e){document.getElementById("preview").select?.();msg("복사 실패 — 미리보기에서 직접 복사하세요.","err");}
+  });
+  document.getElementById("download").addEventListener("click",()=>{
+    if(!items.length){msg("추가된 게시물이 없습니다.","err");return;}
+    const blob=new Blob([json()],{type:"application/json"});
+    const a=document.createElement("a");a.href=URL.createObjectURL(blob);
+    a.download="instagram_manual.json";a.click();URL.revokeObjectURL(a.href);
+    msg("instagram_manual.json 다운로드됨.","ok");
+  });
+  document.getElementById("importBtn").addEventListener("click",()=>{
+    const t=document.getElementById("importArea").value.trim();
+    if(!t)return;
+    try{
+      const arr=JSON.parse(t);
+      if(!Array.isArray(arr))throw new Error("배열이 아님");
+      const valid=arr.filter(r=>r&&BRANDS[r.brand]&&r.title&&r.date)
+        .map(r=>({brand:r.brand,title:String(r.title),date:String(r.date),...(r.url?{url:String(r.url)}:{})}));
+      items=valid;render();msg(`${valid.length}건 불러왔습니다.`,"ok");
+    }catch(e){msg("JSON 형식이 올바르지 않습니다.","err");}
+  });
+
+  render();
+</script>
+</body>
+</html>
