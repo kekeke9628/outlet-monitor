@@ -429,6 +429,49 @@ def dedup(items: List[Dict]) -> List[Dict]:
         seen.add(a["id"]); out.append(a)
     return out
 
+NEAR_DUP_THRESHOLD = 0.82
+
+def cluster_near_duplicate_keys(items: List[Dict], threshold: float = NEAR_DUP_THRESHOLD) -> None:
+    """dedupe_key(정확 매칭)로 못 잡는 근접 중복("...행사" vs "...행사 개최" 등)을
+    같은 브랜드 안에서 difflib(표준 라이브러리, 외부 의존성 없음)로 제목 유사도를 비교해
+    묶는다. threshold 이상이면 같은 dedupe_key 로 합치고, 대표 키는 실행마다 결과가
+    안정적이도록 사전순으로 가장 작은 키를 쓴다. in-place로 items 를 수정한다."""
+    from difflib import SequenceMatcher
+
+    by_brand: Dict[str, Dict[str, List[Dict]]] = {}
+    for a in items:
+        by_brand.setdefault(a["brand"], {}).setdefault(a["dedupe_key"], []).append(a)
+
+    for groups in by_brand.values():
+        keys = list(groups.keys())
+        titles = {k: _normalize_title_for_dedupe(groups[k][0]["title"]) for k in keys}
+        parent = {k: k for k in keys}
+
+        def find(k):
+            while parent[k] != k:
+                parent[k] = parent[parent[k]]
+                k = parent[k]
+            return k
+
+        def union(ka, kb):
+            ra, rb = find(ka), find(kb)
+            if ra != rb:
+                parent[rb if ra < rb else ra] = ra if ra < rb else rb
+
+        for i in range(len(keys)):
+            for j in range(i + 1, len(keys)):
+                ki, kj = keys[i], keys[j]
+                if find(ki) == find(kj):
+                    continue
+                if SequenceMatcher(None, titles[ki], titles[kj]).ratio() >= threshold:
+                    union(ki, kj)
+
+        for k in keys:
+            root = find(k)
+            if root != k:
+                for a in groups[k]:
+                    a["dedupe_key"] = root
+
 def mark_new(items: List[Dict], prev_path: str) -> None:
     """직전 스냅샷(= 이번에 덮어쓸 output 파일) 대비 처음 등장한 항목에 isNew=True.
     최초 실행(스냅샷 없음)에는 최근 3일 내 발생/진행 항목을 신규로 간주."""
@@ -476,6 +519,7 @@ def run(output_path: str) -> Dict:
     stage("tourism", "외국인 동향(뉴스 RSS)", collect_tourism)
 
     activities = dedup([normalize(a) for a in activities])
+    cluster_near_duplicate_keys(activities)           # 근접 중복(제목 유사) dedupe_key 병합
     mark_new(activities, output_path)                # 이전 스냅샷과 비교
     activities.sort(key=lambda a: a.get("date") or a.get("end", ""), reverse=True)
 
