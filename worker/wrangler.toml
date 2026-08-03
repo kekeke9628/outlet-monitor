@@ -1,0 +1,8 @@
+name = "outlet-monitor-trigger"
+main = "src/index.js"
+compatibility_date = "2025-01-01"
+
+# 시크릿(GITHUB_TOKEN, APP_SECRET)은 여기에 적지 않는다.
+# 배포 후 아래 명령으로 각각 등록:
+#   npx wrangler secret put GITHUB_TOKEN
+#   npx wrangler secret put APP_SECRET

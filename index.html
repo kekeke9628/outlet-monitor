@@ -227,6 +227,8 @@
       <div class="crawl-time">
         최종 수집
         <b id="lastCrawl"><span class="dot"></span>—</b>
+        <button id="triggerBtn" class="chip" type="button" style="margin-left:8px">지금 업데이트</button>
+        <span id="triggerStatus" style="font-size:11px;color:var(--muted);margin-left:6px"></span>
       </div>
     </div>
 
@@ -287,6 +289,14 @@
      /wp-json/outlet-monitor/v1/snapshot
 ================================================= */
 const API_ENDPOINT = "data.json";
+
+/* "지금 업데이트" 버튼 → Cloudflare Worker 프록시 → GitHub Actions workflow_dispatch.
+   GitHub 토큰은 여기 없다(Worker 시크릿으로만 존재). TRIGGER_APP_SECRET 은 GitHub 자격증명이
+   아니라 단순 남용 방지용 문자열이며, 노출돼도 최악의 경우 "누군가 Actions를 몇 번 더 돌린다"
+   수준의 피해만 있다(퍼블릭 레포·무료 Actions·이 레포 전용 권한 최소화 토큰이라 안전).
+   worker/README.md 안내대로 배포 후 아래 두 값을 실제 값으로 바꿔 넣는다. */
+const TRIGGER_ENDPOINT = "REPLACE_WITH_WORKER_URL"; // 예: https://outlet-monitor-trigger.<subdomain>.workers.dev
+const TRIGGER_APP_SECRET = "REPLACE_WITH_APP_SECRET";
 
 /* 뷰 표현용 카테고리 메타(레이아웃 소유). 데이터 내용과 분리. */
 const CATS=[
@@ -898,6 +908,39 @@ async function load(){
   }
 }
 load();
+
+/* ---------- 지금 업데이트 버튼 ---------- */
+(function initTrigger(){
+  const btn=document.getElementById("triggerBtn");
+  const status=document.getElementById("triggerStatus");
+  if(!btn)return;
+  if(TRIGGER_ENDPOINT.startsWith("REPLACE_WITH")){
+    btn.disabled=true;btn.title="worker/README.md 안내대로 배포 후 TRIGGER_ENDPOINT를 설정하세요";
+    btn.style.opacity=.5;btn.style.cursor="not-allowed";
+    return;
+  }
+  btn.addEventListener("click",async()=>{
+    btn.disabled=true;status.textContent="요청 중…";
+    try{
+      const res=await fetch(TRIGGER_ENDPOINT,{
+        method:"POST",
+        headers:{"X-App-Secret":TRIGGER_APP_SECRET,"Content-Type":"application/json"},
+      });
+      const body=await res.json().catch(()=>({}));
+      if(res.ok&&body.ok){
+        status.textContent="요청됨 · 1-2분 후 새로고침하세요";
+      }else if(res.status===429){
+        status.textContent=`너무 잦은 요청 · ${body.retryAfterSec||"잠시"}초 후 재시도`;
+      }else{
+        status.textContent="실패: "+(body.error||res.status);
+      }
+    }catch(err){
+      status.textContent="실패: "+err.message;
+    }finally{
+      setTimeout(()=>{btn.disabled=false;},3000);
+    }
+  });
+})();
 </script>
 </body>
 </html>
