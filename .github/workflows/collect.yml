@@ -41,6 +41,46 @@ jobs:
           cp index.html instagram_input.html _site/
           python collector.py --out _site/data.json || true
 
+      - name: 수집 실패 여부를 Actions 요약에 표시
+        # collector.py 는 실패해도 배포를 막지 않지만(위 || true), 그 실패가
+        # Actions 실행 화면에서 조용히 사라지면 안 되므로 data.json 의 "수집 상태"
+        # (sources) 를 읽어 $GITHUB_STEP_SUMMARY 에 표로 남긴다. 무료 · 추가 서비스 불필요.
+        if: always()
+        run: |
+          python - <<'PY'
+          import json, os
+
+          summary_path = os.environ["GITHUB_STEP_SUMMARY"]
+          data_path = "_site/data.json"
+
+          try:
+              with open(data_path, encoding="utf-8") as f:
+                  data = json.load(f)
+          except Exception as e:
+              with open(summary_path, "a", encoding="utf-8") as f:
+                  f.write(f"## ⚠️ data.json 을 읽지 못했습니다\n\n{e}\n")
+              raise SystemExit(0)
+
+          sources = data.get("sources", [])
+          errors = [s for s in sources if s.get("status") == "error"]
+          mark = {"auto": "✅", "semi": "🟡", "error": "❌"}
+
+          lines = [f"## 수집 상태 · {data.get('generatedAt', '?')}", "",
+                   "| 소스 | 상태 | 비고 |", "|---|---|---|"]
+          for s in sources:
+              st = s.get("status", "?")
+              lines.append(f"| {s.get('name', '?')} | {mark.get(st, '❓')} {st} | {s.get('note', '')} |")
+          lines.append("")
+          if errors:
+              names = ", ".join(s.get("name", "?") for s in errors)
+              lines.append(f"**⚠️ {len(errors)}개 소스 실패: {names}** — 배포는 계속되었지만 일부 데이터가 누락되었을 수 있습니다.")
+          else:
+              lines.append("모든 소스 정상 수집됨.")
+
+          with open(summary_path, "a", encoding="utf-8") as f:
+              f.write("\n".join(lines) + "\n")
+          PY
+
       - name: Pages 설정
         uses: actions/configure-pages@v5
 

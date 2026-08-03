@@ -41,6 +41,7 @@ BRANDS = {
                 "insta": "https://www.lotteshopping.com/"},
 }
 # status = 기간에 걸치면 노출 / event = 발생일이 기간 안이면 노출
+# 카테고리별 표시 모드의 단일 소스(SSOT). HP_CATEGORIES/collect_news/collect_tourism 이 참조한다.
 CATEGORY_MODE = {
     "promotions": "status", "events": "status", "new-brands": "event",
     "social": "event", "news": "event", "foreign-trends": "event",
@@ -103,8 +104,9 @@ def collect_homepage(brand: str) -> List[Dict]:
     관련 소식을 수집한다. 별도 설정·입력 없이 바로 동작한다.
     네트워크 불가 등으로 모두 실패하면 SEED 예시로 대체."""
     out, errors = [], 0
-    for category, (mode, terms) in HP_CATEGORIES.items():
+    for category, terms in HP_CATEGORIES.items():
         q = f"{BRAND_NAME[brand]} {terms}"
+        mode = CATEGORY_MODE[category]
         rows, err = _collect_rss(category, {brand: q}, HP_LOOKBACK_DAYS, HP_PER_BRAND, mode)
         out.extend(rows); errors += err
     if not out and errors:
@@ -118,16 +120,16 @@ def _homepage_seed(brand: str) -> List[Dict]:
 
 # --- 홈페이지(프로모션/이벤트/신규입점) 수집 설정 (구글 뉴스 RSS) --------------
 # 각 사 사이트를 직접 긁지 않고, 브랜드명 + 카테고리 키워드로 공개 뉴스에서 수집한다.
-# mode: status(기간형: 발행일을 시작=종료로) / event(발생일형). 키워드는 조정 가능.
+# mode(status/event)는 위 CATEGORY_MODE 를 따른다(중복 정의 방지). 키워드는 조정 가능.
 BRAND_NAME = {
     "sse":     "신세계 프리미엄 아울렛",
     "hyundai": "현대 프리미엄 아울렛",
     "lotte":   "롯데 프리미엄 아울렛",
 }
 HP_CATEGORIES = {
-    "promotions": ("status", "(세일 OR 프로모션 OR 할인 OR 특가)"),
-    "events":     ("status", "(이벤트 OR 팝업 OR 전시 OR 체험)"),
-    "new-brands": ("event",  "(입점 OR 오픈 OR 신규 브랜드)"),
+    "promotions": "(세일 OR 프로모션 OR 할인 OR 특가)",
+    "events":     "(이벤트 OR 팝업 OR 전시 OR 체험)",
+    "new-brands": "(입점 OR 오픈 OR 신규 브랜드)",
 }
 HP_LOOKBACK_DAYS = 30
 HP_PER_BRAND = 8
@@ -142,7 +144,8 @@ def _extract_dates(text: str) -> List[str]:
 
 def collect_news() -> List[Dict]:
     """뉴스: 구글 뉴스 RSS (API 키 불필요)."""
-    out, errors = _collect_rss("news", NEWS_QUERY, NEWS_LOOKBACK_DAYS, NEWS_PER_BRAND, "event")
+    out, errors = _collect_rss("news", NEWS_QUERY, NEWS_LOOKBACK_DAYS, NEWS_PER_BRAND,
+                                CATEGORY_MODE["news"])
     if not out and errors:                           # 네트워크 불가 → 데모/폴백
         return _seed(category="news")
     return out
@@ -196,7 +199,11 @@ def _collect_rss(category, query_map, lookback_days, per_brand, mode="event"):
             row = dict(brand=brand, category=category, title=title,
                        type=it.get("source") or "뉴스", url=url, source="기사")
             if mode == "status":
+                # 실제 세일/행사 기간 데이터가 없어 보도일을 start=end 로 대신 채운다.
+                # date_basis="reported" 로 "이 날짜는 보도일이며 실제 기간이 아님"을 명시해
+                # 프론트가 "07.29–07.29" 같은 가짜 기간 대신 "보도일: 07.29" 로 표시할 수 있게 한다.
                 row["start"] = row["end"] = d.isoformat()
+                row["date_basis"] = "reported"
             else:
                 row["date"] = d.isoformat()
             out.append(row)
@@ -217,6 +224,8 @@ def collect_youtube() -> List[Dict]:
         for e in _yt_feed_entries(xml)[:YT_PER_CHANNEL]:
             title, vid, published = e["title"], e["videoId"], e["published"]
             if not vid or not title:
+                continue
+            if not _yt_title_is_relevant(brand, title):
                 continue
             try:
                 d = dt.datetime.fromisoformat(
@@ -244,6 +253,24 @@ YT_CHANNELS = {
 }
 YT_LOOKBACK_DAYS = 30
 YT_PER_CHANNEL = 10
+
+# 채널별 제목 키워드 필터. 신세계사이먼 채널은 이미 아울렛 전용이라 필터가 필요 없다
+# (None = 필터 없음, 전부 통과). 현대/롯데는 백화점 통합 채널이라 아울렛과 무관한
+# 영상(예: 다른 나라 웹드라마 홍보물 등)이 섞여 나오므로, 브랜드명·"아울렛"·실제
+# 아울렛 지점명이 제목에 있어야 통과시킨다. 지점명은 필요에 맞게 조정 가능.
+YT_KEYWORD_FILTER = {
+    "sse":     None,
+    "hyundai": ("아울렛", "outlet", "OUTLET", "김포", "대전", "송도", "스페이스원"),
+    "lotte":   ("아울렛", "outlet", "OUTLET", "파주", "이천", "동부산", "광명", "율하", "김해"),
+}
+
+def _yt_title_is_relevant(brand: str, title: str) -> bool:
+    """채널이 아울렛 전용이 아닌 경우, 제목에 아울렛 관련 키워드가 있는지 검사."""
+    kws = YT_KEYWORD_FILTER.get(brand)
+    if not kws:
+        return True
+    tl = title.lower()
+    return any(k.lower() in tl for k in kws)
 
 def _yt_feed_url(channel: str) -> str:
     return "https://www.youtube.com/feeds/videos.xml?channel_id=" + channel
@@ -333,7 +360,8 @@ def collect_tourism() -> List[Dict]:
     """외국인 동향: 구글 뉴스 RSS (API 키 불필요).
     브랜드명 + 외국인·관광 키워드로 각 사의 외국인 대상 활동·보도를 수집한다."""
     out, errors = _collect_rss("foreign-trends", FOREIGN_QUERY,
-                               FOREIGN_LOOKBACK_DAYS, FOREIGN_PER_BRAND, "event")
+                               FOREIGN_LOOKBACK_DAYS, FOREIGN_PER_BRAND,
+                               CATEGORY_MODE["foreign-trends"])
     if not out and errors:
         return _seed(category="foreign-trends")
     return out
@@ -368,6 +396,14 @@ def source_link(a: Dict) -> Dict:
         return {"source": "관광 데이터랩", "url": "https://datalab.visitkorea.or.kr/"}
     return {"source": "공식 홈페이지", "url": b["home"]}
 
+def _normalize_title_for_dedupe(title: str) -> str:
+    """중복판별용 제목 정규화: 공백 정리 + 흔한 후행 구두점/부호 제거.
+    한국어 조사는 형태소분석기 없이 안전하게 뗄 수 없어 건드리지 않는다."""
+    t = htmllib.unescape(title or "").strip()
+    t = re.sub(r"\s+", " ", t)
+    t = re.sub(r"[\"'“”‘’·\-–—_:;,.!?…\s]+$", "", t)
+    return t.strip()
+
 def normalize(a: Dict) -> Dict:
     a.setdefault("collect", "auto")
     if not a.get("url"):
@@ -377,6 +413,12 @@ def normalize(a: Dict) -> Dict:
     key = "|".join([a["brand"], a["category"], a["title"],
                     a.get("date") or a.get("start", "")])
     a["id"] = hashlib.sha1(key.encode("utf-8")).hexdigest()[:12]
+    # 카테고리 무관 동일기사 식별자: brand + 정규화제목 만으로 계산.
+    # 같은 기사가 여러 카테고리(예: promotions·news)에 함께 걸리는 경우, id 는 카테고리가
+    # 달라 서로 다르지만 dedupe_key 는 같아진다 → 프론트가 이 값으로 묶어서 중복 노출을 줄일 수 있다.
+    # (기존 카테고리 기반 dedup(id)는 그대로 유지하고, 이 필드는 별도로 추가한다.)
+    dedupe_src = a["brand"] + "|" + _normalize_title_for_dedupe(a["title"])
+    a["dedupe_key"] = hashlib.sha1(dedupe_src.encode("utf-8")).hexdigest()[:12]
     a["collectedAt"] = NOW_ISO
     return a
 
@@ -424,9 +466,11 @@ def run(output_path: str) -> Dict:
             log(f"  ! {name}: 실패 - {e}")
 
     for bk, bv in BRANDS.items():
-        stage(f"home-{bk}", f"{bv['label']} 공식 홈페이지",
+        # 실제로는 각 사 홈페이지를 크롤링하지 않고 브랜드명 기반 구글 뉴스 RSS 검색으로
+        # 대체하고 있으므로, 라벨이 실제 수집 방식을 반영하도록 표기한다.
+        stage(f"home-{bk}", f"{bv['label']} 브랜드 뉴스검색(홈페이지 대체)",
               lambda bk=bk: collect_homepage(bk))
-    stage("news", "뉴스 검색 API", collect_news)
+    stage("news", "뉴스검색(구글 뉴스 RSS)", collect_news)
     stage("youtube", "유튜브 공식 채널", collect_youtube)
     stage("insta", "인스타그램", collect_instagram_manual, collect="semi")
     stage("tourism", "외국인 동향(뉴스 RSS)", collect_tourism)
