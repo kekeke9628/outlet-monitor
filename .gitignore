@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+data.json
+_site/
+worker/node_modules/
