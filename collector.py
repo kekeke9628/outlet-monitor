@@ -430,7 +430,7 @@ def dedup(items: List[Dict]) -> List[Dict]:
     return out
 
 NEAR_DUP_SEQ_THRESHOLD = 0.82
-NEAR_DUP_JACCARD_THRESHOLD = 0.40
+NEAR_DUP_JACCARD_THRESHOLD = 0.35
 NEAR_DUP_JACCARD_MIN_TOKENS = 4
 
 # 조사 제거용 최소 규칙(형태소분석기 없이). 긴 것부터 먼저 검사해 오탐(짧은 조사가 더 긴
