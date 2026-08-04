@@ -429,13 +429,56 @@ def dedup(items: List[Dict]) -> List[Dict]:
         seen.add(a["id"]); out.append(a)
     return out
 
-NEAR_DUP_THRESHOLD = 0.82
+NEAR_DUP_SEQ_THRESHOLD = 0.82
+NEAR_DUP_JACCARD_THRESHOLD = 0.40
+NEAR_DUP_JACCARD_MIN_TOKENS = 4
 
-def cluster_near_duplicate_keys(items: List[Dict], threshold: float = NEAR_DUP_THRESHOLD) -> None:
-    """dedupe_key(정확 매칭)로 못 잡는 근접 중복("...행사" vs "...행사 개최" 등)을
-    같은 브랜드 안에서 difflib(표준 라이브러리, 외부 의존성 없음)로 제목 유사도를 비교해
-    묶는다. threshold 이상이면 같은 dedupe_key 로 합치고, 대표 키는 실행마다 결과가
-    안정적이도록 사전순으로 가장 작은 키를 쓴다. in-place로 items 를 수정한다."""
+# 조사 제거용 최소 규칙(형태소분석기 없이). 긴 것부터 먼저 검사해 오탐(짧은 조사가 더 긴
+# 조사의 일부인 경우) 방지. 1글자 조사는 토큰이 충분히 길 때만 떼어낸다 — 그렇지 않으면
+# "증가"→"증"처럼 실제 단어를 훼손할 위험이 커진다.
+_PARTICLES_2PLUS = ("에서", "에게", "으로", "까지", "부터", "처럼", "보다",
+                    "이라는", "라는", "한테", "이나", "에는", "에도", "와의", "과의")
+_PARTICLES_1 = ("은", "는", "이", "가", "을", "를", "의", "도", "만", "에", "로", "와", "과")
+
+def _strip_particle(token: str) -> str:
+    for p in _PARTICLES_2PLUS:
+        if token.endswith(p) and len(token) > len(p) + 1:
+            return token[: -len(p)]
+    if len(token) >= 4:
+        for p in _PARTICLES_1:
+            if token.endswith(p):
+                return token[:-1]
+    return token
+
+def _tokenize_for_dedupe(title: str) -> set:
+    """제목을 한글/영숫자 토큰으로 쪼개고 흔한 조사를 뗀 뒤 2글자 미만은 버린다.
+    어순이 달라진 근접 중복(기자마다 다르게 재배열한 헤드라인)을 잡기 위한 용도이며,
+    dedupe_key 자체(정규화 문자열 매칭)와는 별개의 보조 신호다."""
+    raw = re.findall(r"[가-힣A-Za-z0-9&]+", title)
+    return {_strip_particle(t) for t in raw if len(t) >= 2}
+
+def _is_near_duplicate(title_a: str, title_b: str, seq_ratio: float) -> bool:
+    """difflib 비율이 임계값 미만이어도, 어순이 바뀐 채 핵심 단어를 충분히 공유하면
+    같은 사건으로 본다(자카드 유사도). 토큰 4개 미만인 짧은 제목엔 적용하지 않는다 —
+    표본이 작을수록 우연히 겹칠 확률이 높아 오탐 위험이 커지기 때문이다."""
+    if seq_ratio >= NEAR_DUP_SEQ_THRESHOLD:
+        return True
+    ta, tb = _tokenize_for_dedupe(title_a), _tokenize_for_dedupe(title_b)
+    if len(ta) < NEAR_DUP_JACCARD_MIN_TOKENS or len(tb) < NEAR_DUP_JACCARD_MIN_TOKENS:
+        return False
+    union = ta | tb
+    if not union:
+        return False
+    jaccard = len(ta & tb) / len(union)
+    return jaccard >= NEAR_DUP_JACCARD_THRESHOLD
+
+def cluster_near_duplicate_keys(items: List[Dict]) -> None:
+    """dedupe_key(정확 매칭)로 못 잡는 근접 중복을 같은 브랜드 안에서 두 가지 신호로
+    묶는다: ①difflib(문자열 순서 유지된 근접 중복, 예 "...행사" vs "...행사 개최")
+    ②토큰 자카드 유사도(어순이 바뀐 근접 중복, 예 언론사마다 절 순서를 재배열한 경우).
+    둘 다 표준 라이브러리만 쓴다(외부 의존성 없음). 임계값 이상이면 같은 dedupe_key 로
+    합치고, 대표 키는 실행마다 결과가 안정적이도록 사전순으로 가장 작은 키를 쓴다.
+    in-place로 items 를 수정한다."""
     from difflib import SequenceMatcher
 
     by_brand: Dict[str, Dict[str, List[Dict]]] = {}
@@ -463,7 +506,8 @@ def cluster_near_duplicate_keys(items: List[Dict], threshold: float = NEAR_DUP_T
                 ki, kj = keys[i], keys[j]
                 if find(ki) == find(kj):
                     continue
-                if SequenceMatcher(None, titles[ki], titles[kj]).ratio() >= threshold:
+                ratio = SequenceMatcher(None, titles[ki], titles[kj]).ratio()
+                if _is_near_duplicate(titles[ki], titles[kj], ratio):
                     union(ki, kj)
 
         for k in keys:
