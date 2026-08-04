@@ -34,11 +34,11 @@ jobs:
           python-version: "3.12"
 
       - name: 수집 실행 + 사이트 폴더 구성
-        # 최상위의 index.html / instagram_input.html 을 _site 로 모으고 data.json 생성
+        # 최상위의 index.html 을 _site 로 모으고 data.json 생성
         # 일부 소스가 잠깐 실패해도 배포는 계속 진행(대시보드 '수집 상태'에 표시됨)
         run: |
           mkdir -p _site
-          cp index.html instagram_input.html _site/
+          cp index.html _site/
           python collector.py --out _site/data.json || true
 
       - name: 수집 실패 여부를 Actions 요약에 표시

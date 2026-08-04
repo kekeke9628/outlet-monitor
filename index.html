@@ -281,7 +281,7 @@
   <div class="mock-note">※ 대시보드는 크롤러가 생성한 <b>data.json</b> 만 읽습니다. 각 항목의 <b>출처 ↗</b> 링크는 수집된 원문(기사·영상) URL로 연결됩니다.</div>
 
   <footer id="app-footer">
-    <b>데이터 출처</b> · 브랜드명 기반 구글 뉴스 RSS 검색(프로모션·이벤트·신규입점·뉴스·외국인동향) · 각 사 공식 유튜브 채널 RSS(영상) · 인스타그램 반자동 수동입력(SNS)<br>
+    <b>데이터 출처</b> · 브랜드명 기반 구글 뉴스 RSS 검색(프로모션·이벤트·신규입점·뉴스·외국인동향) · 각 사 공식 유튜브 채널 RSS(SNS)<br>
     수집 항목은 제목·기간·링크 등 공개 사실 정보에 한하며, 원문은 각 출처로 연결됩니다. 각 사 홈페이지 직접 크롤링이나 별도 관광 통계 API 연동은 사용하지 않습니다.
   </footer>
 </div>
@@ -307,7 +307,7 @@ const CATS=[
   {id:"promotions",   no:"01", name:"프로모션 / 세일", mode:"status"},
   {id:"events",       no:"02", name:"이벤트 / 팝업 / 콘텐츠", mode:"status"},
   {id:"new-brands",   no:"03", name:"신규 입점 브랜드", mode:"event"},
-  {id:"social",       no:"04", name:"SNS", mode:"event", semi:true},
+  {id:"social",       no:"04", name:"SNS", mode:"event"},
   {id:"news",         no:"05", name:"뉴스", mode:"event"},
   {id:"foreign-trends",no:"06",name:"외국인 동향", mode:"event"},
 ];
@@ -360,13 +360,6 @@ const SAMPLE=/*__SAMPLE__*/{
       "status": "auto",
       "lastRun": "2026-07-04T17:44:23.524956+09:00",
       "note": "1건"
-    },
-    {
-      "id": "insta",
-      "name": "인스타그램",
-      "status": "semi",
-      "lastRun": "2026-07-04T17:44:23.524956+09:00",
-      "note": "4건"
     },
     {
       "id": "tourism",
@@ -506,19 +499,6 @@ const SAMPLE=/*__SAMPLE__*/{
     },
     {
       "brand": "sse",
-      "category": "social",
-      "title": "인스타 릴스 · 스노우존 티저",
-      "type": "인스타",
-      "date": "2026-07-03",
-      "collect": "semi",
-      "source": "인스타그램",
-      "url": "https://www.instagram.com/premiumoutlets.korea/",
-      "id": "c4a47d8cc93e",
-      "collectedAt": "2026-07-04T17:44:23.524956+09:00",
-      "isNew": false
-    },
-    {
-      "brand": "sse",
       "category": "new-brands",
       "title": "명품 시계 편집숍 신규 오픈",
       "type": "럭셔리",
@@ -527,19 +507,6 @@ const SAMPLE=/*__SAMPLE__*/{
       "source": "공식 홈페이지",
       "url": "https://www.premiumoutlets.co.kr/",
       "id": "6214f1f233f2",
-      "collectedAt": "2026-07-04T17:44:23.524956+09:00",
-      "isNew": false
-    },
-    {
-      "brand": "hyundai",
-      "category": "social",
-      "title": "인스타 · 워터플레이 오픈 안내",
-      "type": "인스타",
-      "date": "2026-07-02",
-      "collect": "semi",
-      "source": "인스타그램",
-      "url": "https://www.instagram.com/hyundaioutlets/",
-      "id": "0a9b04c52551",
       "collectedAt": "2026-07-04T17:44:23.524956+09:00",
       "isNew": false
     },
@@ -584,19 +551,6 @@ const SAMPLE=/*__SAMPLE__*/{
     },
     {
       "brand": "lotte",
-      "category": "social",
-      "title": "인스타 · 블랙프라이스 카드뉴스",
-      "type": "인스타",
-      "date": "2026-07-01",
-      "collect": "semi",
-      "source": "인스타그램",
-      "url": "https://www.lotteshopping.com/",
-      "id": "249ebfa621ac",
-      "collectedAt": "2026-07-04T17:44:23.524956+09:00",
-      "isNew": false
-    },
-    {
-      "brand": "lotte",
       "category": "foreign-trends",
       "title": "다국어 안내 앱 업데이트 (영·중·일)",
       "type": "디지털",
@@ -618,19 +572,6 @@ const SAMPLE=/*__SAMPLE__*/{
       "source": "공식 홈페이지",
       "url": "https://www.lotteshopping.com/",
       "id": "2c5f1f4d95b1",
-      "collectedAt": "2026-07-04T17:44:23.524956+09:00",
-      "isNew": false
-    },
-    {
-      "brand": "lotte",
-      "category": "social",
-      "title": "인스타 · 신규 리빙관 소개",
-      "type": "인스타",
-      "date": "2026-06-30",
-      "collect": "semi",
-      "source": "인스타그램",
-      "url": "https://www.lotteshopping.com/",
-      "id": "3cda6e9c7712",
       "collectedAt": "2026-07-04T17:44:23.524956+09:00",
       "isNew": false
     },

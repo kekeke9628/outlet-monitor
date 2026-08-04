@@ -12,8 +12,12 @@
 - 저작권 보호: 원문 텍스트/이미지를 저장하지 않고 제목·기간·링크 등 사실 정보만 담는다.
 
 실행:  python collector.py  →  data.json 생성
-API 키 불필요: 뉴스·외국인동향·홈페이지=구글 뉴스 RSS, 유튜브=채널 공개 RSS,
-                  인스타=반자동 입력. 순수 표준 라이브러리(외부 패키지 불필요).
+API 키 불필요: 뉴스·외국인동향·홈페이지=구글 뉴스 RSS, 유튜브=채널 공개 RSS.
+                  순수 표준 라이브러리(외부 패키지 불필요).
+
+인스타그램: 공식 API가 본인 소유 계정만 허용해 경쟁사 계정을 무료·무인으로
+수집할 방법이 없어 아예 제외했다(과거엔 반자동 수동 입력을 시도했으나 실사용 없이
+항상 빈 상태였음). SNS 카테고리는 유튜브만으로 채워진다.
 """
 import os, sys, json, hashlib, tempfile, argparse, datetime as dt
 import re, html as htmllib
@@ -33,12 +37,9 @@ def log(msg: str) -> None:
     print(f"[{dt.datetime.now(KST).strftime('%Y-%m-%d %H:%M:%S')}] {msg}", file=sys.stderr)
 
 BRANDS = {
-    "sse":     {"label": "신세계", "home": "https://www.premiumoutlets.co.kr/",
-                "insta": "https://www.instagram.com/premiumoutlets.korea/"},
-    "hyundai": {"label": "현대",   "home": "https://www.ehyundai.com/newPortal/outlet/main.do",
-                "insta": "https://www.instagram.com/hyundaioutlets/"},
-    "lotte":   {"label": "롯데",   "home": "https://www.lotteshopping.com/",
-                "insta": "https://www.lotteshopping.com/"},
+    "sse":     {"label": "신세계", "home": "https://www.premiumoutlets.co.kr/"},
+    "hyundai": {"label": "현대",   "home": "https://www.ehyundai.com/newPortal/outlet/main.do"},
+    "lotte":   {"label": "롯데",   "home": "https://www.lotteshopping.com/"},
 }
 # status = 기간에 걸치면 노출 / event = 발생일이 기간 안이면 노출
 # 카테고리별 표시 모드의 단일 소스(SSOT). HP_CATEGORIES/collect_news/collect_tourism 이 참조한다.
@@ -67,12 +68,8 @@ SEED = [
     dict(brand="sse", category="new-brands", title="명품 시계 편집숍 신규 오픈", type="럭셔리", date="2026-07-02"),
     dict(brand="lotte", category="new-brands", title="리빙관 확장 · 5개 브랜드 입점", type="리빙", date="2026-06-30"),
     dict(brand="hyundai", category="new-brands", title="스포츠 플래그십 리뉴얼", type="스포츠", date="2026-06-18"),
-    # ── SNS (event) : 유튜브=자동 / 인스타=반자동(수동입력) ──
-    dict(brand="sse", category="social", title="인스타 릴스 · 스노우존 티저", type="인스타", date="2026-07-03", collect="semi"),
+    # ── SNS (event) : 유튜브 채널 RSS(자동) ──
     dict(brand="sse", category="social", title="유튜브 · 여름 브랜드 하울", type="유튜브", date="2026-07-01", collect="auto"),
-    dict(brand="hyundai", category="social", title="인스타 · 워터플레이 오픈 안내", type="인스타", date="2026-07-02", collect="semi"),
-    dict(brand="lotte", category="social", title="인스타 · 블랙프라이스 카드뉴스", type="인스타", date="2026-07-01", collect="semi"),
-    dict(brand="lotte", category="social", title="인스타 · 신규 리빙관 소개", type="인스타", date="2026-06-30", collect="semi"),
     # ── 뉴스 (event) ──
     dict(brand="sse", category="news", title="여주 아울렛, 외국인 매출 비중 20% 돌파", type="매일경제", date="2026-07-03"),
     dict(brand="hyundai", category="news", title="현대아울렛 상반기 실적 발표", type="연합뉴스", date="2026-07-01"),
@@ -134,13 +131,6 @@ HP_CATEGORIES = {
 HP_LOOKBACK_DAYS = 30
 HP_PER_BRAND = 8
 
-
-def _extract_dates(text: str) -> List[str]:
-    """텍스트에서 YYYY.MM.DD / YYYY-MM-DD / YYYY/M/D 형태의 날짜를 순서대로 추출."""
-    out = []
-    for y, m, d in re.findall(r"(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})", text or ""):
-        out.append(f"{int(y):04d}-{int(m):02d}-{int(d):02d}")
-    return out
 
 def collect_news() -> List[Dict]:
     """뉴스: 구글 뉴스 RSS (API 키 불필요)."""
@@ -311,51 +301,6 @@ def _yt_feed_entries(xml: bytes) -> List[Dict]:
         })
     return entries
 
-def collect_instagram_manual(path: str = "instagram_manual.json") -> List[Dict]:
-    """인스타그램: 반자동(수동 입력). 공식 API 는 본인 계정만 허용하므로
-    담당자가 주 1회 각 사 공식 계정 최신 게시물을 아래 파일에 입력하면 병합한다.
-      instagram_manual.json = [{brand,title,date,url?}, ...]
-    입력값을 검증(브랜드/날짜/제목)하고, 예시·오래된 항목은 걸러낸다.
-    파일이 없으면 SEED 의 인스타 항목으로 대체."""
-    if not os.path.exists(path):
-        return _seed(category="social", type_in=("인스타",))
-    try:
-        with open(path, encoding="utf-8") as f:
-            raw = json.load(f)
-    except Exception as e:
-        log(f"    인스타 입력 파일 오류: {e}")
-        return []
-    if not isinstance(raw, list):
-        return []
-
-    cutoff = NOW.date() - dt.timedelta(days=INSTA_LOOKBACK_DAYS)
-    out, skipped = [], 0
-    for r in raw:
-        try:
-            brand = (r.get("brand") or "").strip()
-            title = (r.get("title") or "").strip()
-            dates = _extract_dates(r.get("date", ""))
-            if brand not in BRANDS or not title or not dates:
-                skipped += 1; continue
-            if any(k in title for k in _INSTA_PLACEHOLDER):   # 템플릿 예시 제외
-                skipped += 1; continue
-            d = dt.date.fromisoformat(dates[0])
-            if d < cutoff:                                    # 오래된 항목 제외
-                skipped += 1; continue
-            item = dict(brand=brand, category="social", title=title,
-                        type="인스타", date=d.isoformat(), collect="semi")
-            if r.get("url"):
-                item["url"] = r["url"].strip()
-            out.append(item)
-        except Exception:
-            skipped += 1
-    if skipped:
-        log(f"    인스타 입력: {len(out)}건 반영 · {skipped}건 제외(형식/예시/기간)")
-    return out
-
-INSTA_LOOKBACK_DAYS = 30
-_INSTA_PLACEHOLDER = ("예시", "여기에", "게시물 제목")   # 템플릿 미수정 항목 감지
-
 def collect_tourism() -> List[Dict]:
     """외국인 동향: 구글 뉴스 RSS (API 키 불필요).
     브랜드명 + 외국인·관광 키워드로 각 사의 외국인 대상 활동·보도를 수집한다."""
@@ -389,8 +334,6 @@ def source_link(a: Dict) -> Dict:
         return {"source": "뉴스 검색",
                 "url": "https://search.naver.com/search.naver?where=news&query=" + quote(a["title"])}
     if a["category"] == "social":
-        if a.get("type") == "인스타":
-            return {"source": "인스타그램", "url": b["insta"]}
         return {"source": "유튜브", "url": b["home"]}
     if a["category"] == "foreign-trends" and a.get("type") == "관광통계":
         return {"source": "관광 데이터랩", "url": "https://datalab.visitkorea.or.kr/"}
@@ -559,7 +502,6 @@ def run(output_path: str) -> Dict:
               lambda bk=bk: collect_homepage(bk))
     stage("news", "뉴스검색(구글 뉴스 RSS)", collect_news)
     stage("youtube", "유튜브 공식 채널", collect_youtube)
-    stage("insta", "인스타그램", collect_instagram_manual, collect="semi")
     stage("tourism", "외국인 동향(뉴스 RSS)", collect_tourism)
 
     activities = dedup([normalize(a) for a in activities])
