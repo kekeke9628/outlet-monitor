@@ -316,7 +316,11 @@ const SRC_STATUS={auto:{c:"ok",t:"정상"},semi:{c:"semi",t:"반자동"},error:{
 /* 같은 실제 기사/영상이 카테고리 검색어 특성상 여러 카테고리에 동시 매칭될 수 있음.
    dedupe_key(브랜드+정규화제목)가 같은 항목들 중 아래 우선순위가 가장 높은 카테고리 하나에만
    실제로 노출하고, 나머지 카테고리에서는 카드 자체를 숨긴다(스코어보드 건수/NEW 도 동일 기준). */
-const DEDUPE_PRIORITY=["promotions","events","new-brands","news","social","foreign-trends"];
+/* "뉴스"는 가장 범용적인 검색어라 다른 카테고리와 겹칠 확률이 높다. 반대로
+   "외국인동향"은 보도 빈도가 낮은 희소 카테고리라, 맨 뒤에 두면 겹칠 때마다 매번 밀려서
+   사실상 거의 노출되지 않는다. 그래서 구체적/희소한 카테고리를 앞에, 가장 범용적인
+   "뉴스"를 맨 뒤에 둔다(동점이면 더 구체적인 분류가 이긴다). */
+const DEDUPE_PRIORITY=["promotions","events","new-brands","foreign-trends","social","news"];
 
 /* 오프라인/샌드박스 폴백용 내장 스냅샷 (data.json 로드 실패 시 사용) */
 const SAMPLE=/*__SAMPLE__*/{
